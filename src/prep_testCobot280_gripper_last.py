@@ -18,7 +18,7 @@ class DEFAULT_VAR(Enum):
     PITCH = 0
     YAW = -90
     #-----
-    DIGIT_CTRL = 3
+    DIGIT_CTRL = 2
 
 class Transformation:
     def __init__(self):
@@ -133,7 +133,7 @@ def main():
                         move_to_pose(group, 25/100, Y/100 , Z/100 ,(-1 )*p , r , y )'
                         '''
                         #set position of manipulator
-                        transforms.setBaseManip([159 , 130 , 11.0 ],[0,0,0])
+                        transforms.setBaseManip([159 , 120 , 11.0 ],[0,0,0])
                         transforms.setObjectPose([data.iloc[i]["Position_X"],(data.iloc[i]["Position_Y"]) ,data.iloc[i]["Position_Z"]],
                                                  [(data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value) *-1 , data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value, data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value])
                         matrix = transforms.outputPosition()
@@ -143,6 +143,8 @@ def main():
                         print(x,y * -1 ,z)
                         print(i)
                         if i == 0 :
+                            move_to_pose(group, round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round(((z+3.2)/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
+                            time.sleep(10)
                             move_to_pose(group, round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
                             msg.data = "on"
                             rospy.loginfo("gripper on")
