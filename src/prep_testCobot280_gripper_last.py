@@ -12,14 +12,64 @@ import pandas as pd
 from std_msgs.msg import String
 import time
 import requests
-
+import numpy as np
 class DEFAULT_VAR(Enum):
     ROW = 0
     PITCH = 0
     YAW = -90
 
+class Transformation:
+    def __init__(self):
+        pass
+    def Rx(self,Deg):
+        rx = np.deg2rad(Deg)
+        return np.array([
+        [1, 0, 0],
+        [0, np.cos(rx), -np.sin(rx)],
+        [0, np.sin(rx), np.cos(rx)]
+    ])
+    def Ry(self,Deg):
+        ry = np.deg2rad(Deg)
+        return np.array([
+        [np.cos(ry), 0, np.sin(ry)],
+        [0, 1, 0],
+        [-np.sin(ry), 0, np.cos(ry)]
+    ])
 
+    def Rz(self , Deg):
+        rz = np.deg2rad(Deg)
+        return np.array([
+        [np.cos(rz), -np.sin(rz), 0],
+        [np.sin(rz), np.cos(rz), 0],
+        [0, 0, 1]
+    ])
 
+    def setbaseManip(self,Pose,orien):
+        self.R_baseManip = self.Rz(orien[2]) @ self.Ry(orien[1]) @ self.Rx(orien[0])
+        self.BaseManip = np.eye(4)
+        self.BaseManip[:3, :3] = self.R_baseManip
+        self.BaseManip[:3, 3] = [Pose[0], Pose[1] , Pose[2]]
+
+    def setObjectPose(self,Pose,orien):
+        self.R_baseObject = self.Rz(orien[2]) @ self.Ry(orien[1]) @ self.Rx(orien[0])
+        self.Object = np.eye(4)
+        self.Object[:3, :3] = self.R_baseObject
+        self.Object[:3, 3] = [Pose[0], Pose[1] , Pose[2]]
+
+    def inverseBaseManip(self):
+        R_inv = self.R_baseManip.T  # Transpose ของ rotation
+        t = self.BaseManip[:3, 3]
+        t_inv = -R_inv @ t           # คำนวณ translation ใหม่
+
+        BaseManip_inv = np.eye(4)
+        BaseManip_inv[:3, :3] = R_inv
+        BaseManip_inv[:3, 3] = t_inv
+
+        return BaseManip_inv
+    
+    def outputPostion(self):
+        return self.inverseBaseManip @ self.Object
+    
 def move_to_pose(group, x, y, z, roll, pitch, yaw):
     # Set the target pose
     pose_target = geometry_msgs.msg.Pose()
@@ -70,11 +120,14 @@ def main():
                     msg = String()
                     
                     for i in range(len(data)):
-                        ofset_x , ofset_y , ofset_z =  215 , 130 , 11.0   # recommend in distance X =  25 cm ref from manipulator base origin 
-                        X, Y , Z ,= data.iloc[i]["Position_X"] - ofset_x , ofset_y - data.iloc[i]["Position_Y"] , data.iloc[i]["Position_Z"] - ofset_z
-                        r , p , y = data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value , data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value , data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value
-                        move_to_pose(group, 25/100, Y/100 , Z/100 ,(-1 )*p , r , y )
-                        
+                        #ofset_x , ofset_y , ofset_z =  215 , 130 , 11.0   # recommend in distance X =  25 cm ref from manipulator base origin 
+                        #X, Y , Z ,= data.iloc[i]["Position_X"] - ofset_x , ofset_y - data.iloc[i]["Position_Y"] , data.iloc[i]["Position_Z"] - ofset_z
+                        #r , p , y = data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value , data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value , data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value
+                        #move_to_pose(group, 25/100, Y/100 , Z/100 ,(-1 )*p , r , y )
+                        transforms.setbaseManip([215 , 130 , 11.0 ],[0,0,0])
+                        transforms.setObjectPose([data.iloc[i]["Position_X"],data.iloc[i]["Position_Y"],data.iloc[i]["Position_Z"]],
+                                                 [(data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value) *-1 , data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value, data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value])
+                        print(transforms.outputPostion)
                         if i == 0 :
                             msg.data = "on"
                             rospy.loginfo("gripper on")
@@ -100,4 +153,5 @@ def main():
         moveit_commander.roscpp_shutdown()
 
 if __name__ == '__main__':
+    transforms = Transformation()
     main()
