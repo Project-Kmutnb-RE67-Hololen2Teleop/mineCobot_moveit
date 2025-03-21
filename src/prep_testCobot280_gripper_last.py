@@ -13,6 +13,10 @@ from std_msgs.msg import String
 import time
 import requests
 import numpy as np
+from sensor_msgs.msg import JointState
+from urllib3.exceptions import InsecureRequestWarning
+import warnings
+
 class DEFAULT_VAR(Enum):
     ROW = 0
     PITCH = 0
@@ -74,9 +78,27 @@ class Transformation:
         result = self.BaseManip_inv @ self.Object
         print("Object pose in manipulator frame:\n", result)
         return result
+
+jointState_Data = {
+    "j1":0.0,
+    "j2":0.0,
+    "j3":0.0,
+    "j4":0.0,
+    "j5":0.0,
+    "j6":0.0,
+    "speed":0.0,
+    "gripper":False
+}
+iteration = None
+def JointCallBack(data):
+    global jointState_Data , iteration
+    jointState_Data["j1"] , jointState_Data["j2"] , jointState_Data["j3"] , jointState_Data["j4"] , jointState_Data["j5"] , jointState_Data["j6"] = np.rad2deg(data.position[:6])
+    requests.post(url="https://188.166.222.52:12345/set_Manipulator/setMovementJoint",verify=False ,json=jointState_Data)
     
-    
+
 def move_to_pose(group, x, y, z, roll, pitch, yaw):
+    global jointState_Data , iteration
+    
     # Set the target pose
     pose_target = geometry_msgs.msg.Pose()
     pose_target.position.x = x
@@ -95,17 +117,22 @@ def move_to_pose(group, x, y, z, roll, pitch, yaw):
 
     # Plan and execute the motion (this will block until the robot finishes moving)
     success = group.go(wait=True)
+    
     time.sleep(0.25)
+    print(success)
     if success:
         rospy.loginfo("Movement successful!")
+    
     else:
         rospy.loginfo("Movement failed.")
 
 def main():
+    global jointState_Data , iteration
     # Initialize the moveit_commander and rospy
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('move_to_pose', anonymous=True)
     pub = rospy.Publisher("/gripper_trigger",String,queue_size=10)
+    sub = rospy.Subscriber("joint_states", JointState, JointCallBack)
     # Get the robot's move group
     robot = moveit_commander.RobotCommander()
     group = moveit_commander.MoveGroupCommander("arm_group")  # Replace "arm_group" with your group name
@@ -140,8 +167,8 @@ def main():
                         rotation = R.from_matrix(matrix[:3, :3])
                         Rr,Rp,Ry = rotation.as_euler('xyz', degrees=True)
                         x, y, z = matrix[:3, 3]
-                        print(x,y * -1 ,z)
-                        print(i)
+                        #print(x,y * -1 ,z)
+                        
                         if i == 0 :
                             move_to_pose(group, round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round(((z+3.2)/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
                             time.sleep(10)
@@ -149,7 +176,10 @@ def main():
                             msg.data = "on"
                             rospy.loginfo("gripper on")
                             time.sleep(10)
+                            iteration = "first"
                             pub.publish(msg)
+                            jointState_Data['gripper'] = True
+                            
                         if i > 0 and i < len(data) - 30:
                             msg.data = "pass"
                             pub.publish(msg)
@@ -165,19 +195,26 @@ def main():
                             move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
                             msg.data = "pass"
                             pub.publish(msg)
+                            jointState_Data['gripper'] = True
                             
                         if i == len(data) - 1 :
+                            iteration = "last"
                             msg.data = "off"
                             rospy.loginfo("gripper off")
                             pub.publish(msg)
+                            jointState_Data['gripper'] = False
                             time.sleep(5)
-                        
+                            
+                            
                         else:
                             msg.data = "pass"
                             pub.publish(msg)
+
+                        print(i)
+                        print(iteration)
                         
                     SUB_TRIGGER = False
-                
+            print("pending trajectory ")    
             rospy.sleep(0.1)
     except rospy.ROSInterruptException:
         pass
@@ -187,4 +224,5 @@ def main():
 
 if __name__ == '__main__':
     transforms = Transformation()
+    warnings.simplefilter('ignore', InsecureRequestWarning)
     main()
