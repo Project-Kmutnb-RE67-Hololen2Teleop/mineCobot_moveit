@@ -160,7 +160,7 @@ def main():
                         move_to_pose(group, 25/100, Y/100 , Z/100 ,(-1 )*p , r , y )'
                         '''
                         #set position of manipulator
-                        transforms.setBaseManip([159 , 120 , 11.0 ],[0,0,0])
+                        transforms.setBaseManip([158.8 , 128 , 13.5 ],[0,0,0])
                         transforms.setObjectPose([data.iloc[i]["Position_X"],(data.iloc[i]["Position_Y"]) ,data.iloc[i]["Position_Z"]],
                                                  [(data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value) *-1 , data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value, data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value])
                         matrix = transforms.outputPosition()
