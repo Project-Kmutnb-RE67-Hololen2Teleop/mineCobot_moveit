@@ -23,6 +23,7 @@ class DEFAULT_VAR(Enum):
     YAW = -90
     #-----
     DIGIT_CTRL = 2
+    OFSET_UP = 5
 
 class Transformation:
     def __init__(self):
@@ -126,6 +127,13 @@ def move_to_pose(group, x, y, z, roll, pitch, yaw):
     else:
         rospy.loginfo("Movement failed.")
 
+def MoveSetPose(group,name:str):
+    group.set_named_target(name)
+    # Plan the motion
+    plan = group.go(wait=True)
+    
+    
+
 def main():
     global jointState_Data , iteration
     # Initialize the moveit_commander and rospy
@@ -160,7 +168,7 @@ def main():
                         move_to_pose(group, 25/100, Y/100 , Z/100 ,(-1 )*p , r , y )'
                         '''
                         #set position of manipulator
-                        transforms.setBaseManip([158.8 , 128 , 13.5 ],[0,0,0])
+                        transforms.setBaseManip([158.8 , 129 , 11 ],[0,0,0])
                         transforms.setObjectPose([data.iloc[i]["Position_X"],(data.iloc[i]["Position_Y"]) ,data.iloc[i]["Position_Z"]],
                                                  [(data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value) *-1 , data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value, data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value])
                         matrix = transforms.outputPosition()
@@ -170,9 +178,11 @@ def main():
                         #print(x,y * -1 ,z)
                         
                         if i == 0 :
-                            move_to_pose(group, round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round(((z+3.2)/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
+                            MoveSetPose(group,"prep_pose")
+                            time.sleep(2)
+                            move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round(((z+DEFAULT_VAR.OFSET_UP.value)/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
                             time.sleep(10)
-                            move_to_pose(group, round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
+                            move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
                             msg.data = "on"
                             rospy.loginfo("gripper on")
                             time.sleep(10)
@@ -185,11 +195,11 @@ def main():
                             pub.publish(msg)
                             #print(round(25/100,3) , round((y/100)*-1,3), round((z/100),3))
                             #print(prep_data)
-                            if prep_data != [round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]:
+                            if prep_data != [round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]:
                                 print(True)
-                                move_to_pose(group, round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry )   
+                                move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry )   
                             
-                            prep_data = [round(25/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]
+                            prep_data = [round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]
                         
                         if i >= len(data) - 29 and i < len(data) -1 :
                             move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
@@ -198,12 +208,28 @@ def main():
                             jointState_Data['gripper'] = True
                             
                         if i == len(data) - 1 :
+                            move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
                             iteration = "last"
                             msg.data = "off"
                             rospy.loginfo("gripper off")
                             pub.publish(msg)
                             jointState_Data['gripper'] = False
                             time.sleep(5)
+                        
+                            matrix_last = matrix @ np.array([[1,0,0,0],
+                                                             [0,1,0,0],
+                                                             [0,0,1,DEFAULT_VAR.OFSET_UP.value],
+                                                             [0,0,0,1]])
+                            
+                            Lrotation = R.from_matrix(matrix_last[:3, :3])
+                            LRr,LRp,LRy = Lrotation.as_euler('xyz', degrees=True)
+                            Lx, Ly, Lz = matrix_last[:3, 3]
+                            move_to_pose(group, Lx/100 , (Ly/100)*-1, Lz/100 ,LRr , LRp , LRy )
+                            print(matrix_last)
+                            time.sleep(2)
+                            MoveSetPose(group,"init_pose")
+                            time.sleep(2)
+
                             
                             
                         else:
