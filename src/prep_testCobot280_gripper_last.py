@@ -24,7 +24,10 @@ class DEFAULT_VAR(Enum):
     #-----
     DIGIT_CTRL = 2
     OFSET_UP = 5
-
+    #-----
+    OFSET_MANIP_X = 5.5
+    OFSET_MANIP_Y = 0
+    OFSET_MANIP_Z = 11.5
 class Transformation:
     def __init__(self):
         pass
@@ -77,7 +80,7 @@ class Transformation:
     def outputPosition(self):
         self.computeInverseBaseManip()  # เรียกก่อนเพื่อ set ค่า
         result = self.BaseManip_inv @ self.Object
-        print("Object pose in manipulator frame:\n", result)
+        #print("Object pose in manipulator frame:\n", result)
         return result
 
 jointState_Data = {
@@ -120,7 +123,7 @@ def move_to_pose(group, x, y, z, roll, pitch, yaw):
     success = group.go(wait=True)
     
     time.sleep(0.25)
-    print(success)
+    # print(success)
     if success:
         rospy.loginfo("Movement successful!")
     
@@ -168,7 +171,9 @@ def main():
                         move_to_pose(group, 25/100, Y/100 , Z/100 ,(-1 )*p , r , y )'
                         '''
                         #set position of manipulator
-                        transforms.setBaseManip([158.8 , 129 , 11 ],[0,0,0])
+                        response_MobilePose = requests.get("https://188.166.222.52:12345/MyAGV/Position/current",verify=False).json()
+                        #transforms.setBaseManip([158.8 , 129 , 11 ],[0,0,0])
+                        transforms.setBaseManip([response_MobilePose['x'] + DEFAULT_VAR.OFSET_MANIP_X.value,-(response_MobilePose['y']),DEFAULT_VAR.OFSET_MANIP_Z.value] , [response_MobilePose['row'],-(response_MobilePose['pitch']),response_MobilePose['yaw']])
                         transforms.setObjectPose([data.iloc[i]["Position_X"],(data.iloc[i]["Position_Y"]) ,data.iloc[i]["Position_Z"]],
                                                  [(data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value) *-1 , data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value, data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value])
                         matrix = transforms.outputPosition()
@@ -178,6 +183,7 @@ def main():
                         #print(x,y * -1 ,z)
                         
                         if i == 0 :
+                            print("Iteration :",i+1,"/",len(data)+1 , "start")
                             MoveSetPose(group,"prep_pose")
                             time.sleep(2)
                             move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round(((z+DEFAULT_VAR.OFSET_UP.value)/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
@@ -189,25 +195,27 @@ def main():
                             iteration = "first"
                             pub.publish(msg)
                             jointState_Data['gripper'] = True
-                            
+                            print(msg)
                         if i > 0 and i < len(data) - 30:
                             msg.data = "pass"
                             pub.publish(msg)
                             #print(round(25/100,3) , round((y/100)*-1,3), round((z/100),3))
                             #print(prep_data)
                             if prep_data != [round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]:
-                                print(True)
+                                print("Iteration :",i+1,"/",len(data)+1)
                                 move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry )   
                             
                             prep_data = [round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]
                         
                         if i >= len(data) - 29 and i < len(data) -1 :
+                            print("Iteration :",i+1 , "/",len(data)+1)
                             move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
                             msg.data = "pass"
                             pub.publish(msg)
                             jointState_Data['gripper'] = True
                             
                         if i == len(data) - 1 :
+                            print("Iteration :",i+1 , "/",len(data)+1,"Last")
                             move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
                             iteration = "last"
                             msg.data = "off"
@@ -236,8 +244,8 @@ def main():
                             msg.data = "pass"
                             pub.publish(msg)
 
-                        print(i)
-                        print(iteration)
+                        
+                        #print(iteration)
                         
                     SUB_TRIGGER = False
             print("pending trajectory ")    
