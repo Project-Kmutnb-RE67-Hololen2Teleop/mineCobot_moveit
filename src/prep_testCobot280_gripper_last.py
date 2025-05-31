@@ -25,9 +25,9 @@ class DEFAULT_VAR(Enum):
     DIGIT_CTRL = 2
     OFSET_UP = 5
     #-----
-    OFSET_MANIP_X = 5.5
+    OFSET_MANIP_X = 5.5   #ระยะจาก center ของ mobile ไป centerฐานของ manipulator
     OFSET_MANIP_Y = 0
-    OFSET_MANIP_Z = 11.5
+    OFSET_MANIP_Z = 12    #ระยะสูงจาก center ของ mobile ไป centerฐานของ manipulator
 class Transformation:
     def __init__(self):
         pass
@@ -197,6 +197,7 @@ def main():
                             jointState_Data['gripper'] = True
                             print(msg)
                         if i > 0 and i < len(data) - 30:
+
                             msg.data = "pass"
                             pub.publish(msg)
                             #print(round(25/100,3) , round((y/100)*-1,3), round((z/100),3))
@@ -206,6 +207,7 @@ def main():
                                 move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry )   
                             
                             prep_data = [round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]
+                        
                         
                         if i >= len(data) - 29 and i < len(data) -1 :
                             print("Iteration :",i+1 , "/",len(data)+1)
@@ -228,11 +230,13 @@ def main():
                                                              [0,1,0,0],
                                                              [0,0,1,DEFAULT_VAR.OFSET_UP.value],
                                                              [0,0,0,1]])
-                            
+                            print(matrix)
+                            print("---")
+                            print(matrix_last)
                             Lrotation = R.from_matrix(matrix_last[:3, :3])
                             LRr,LRp,LRy = Lrotation.as_euler('xyz', degrees=True)
                             Lx, Ly, Lz = matrix_last[:3, 3]
-                            move_to_pose(group, Lx/100 , (Ly/100)*-1, Lz/100 ,LRr , LRp , LRy )
+                            move_to_pose(group, Lx/100 , -(Ly/100), Lz/100 ,LRr , LRp , LRy )
                             print(matrix_last)
                             time.sleep(2)
                             MoveSetPose(group,"init_pose")
