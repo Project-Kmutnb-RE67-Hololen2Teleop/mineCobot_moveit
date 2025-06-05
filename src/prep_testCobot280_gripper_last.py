@@ -17,6 +17,7 @@ from sensor_msgs.msg import JointState
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
 import threading
+#TEST_POSE = {'x': 150, 'y': -122, 'row': 0, 'pitch': 0, 'yaw': 0}
 class DEFAULT_VAR(Enum):
     ROW = 0
     PITCH = 0
