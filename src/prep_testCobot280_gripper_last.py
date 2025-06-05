@@ -16,7 +16,7 @@ import numpy as np
 from sensor_msgs.msg import JointState
 from urllib3.exceptions import InsecureRequestWarning
 import warnings
-
+import threading
 class DEFAULT_VAR(Enum):
     ROW = 0
     PITCH = 0
@@ -27,7 +27,9 @@ class DEFAULT_VAR(Enum):
     #-----
     OFSET_MANIP_X = 5.5   #ระยะจาก center ของ mobile ไป centerฐานของ manipulator
     OFSET_MANIP_Y = 0
-    OFSET_MANIP_Z = 12    #ระยะสูงจาก center ของ mobile ไป centerฐานของ manipulator
+    OFSET_MANIP_Z = 11.5    #ระยะสูงจาก center ของ mobile ไป centerฐานของ manipulator
+
+
 class Transformation:
     def __init__(self):
         pass
@@ -93,6 +95,7 @@ jointState_Data = {
     "speed":0.0,
     "gripper":False
 }
+stages = ""
 iteration = None
 def JointCallBack(data):
     global jointState_Data , iteration
@@ -134,11 +137,15 @@ def MoveSetPose(group,name:str):
     group.set_named_target(name)
     # Plan the motion
     plan = group.go(wait=True)
-    
-    
 
+def Threading_CMDtoCTRLMoboile():
+    global stages
+    pub = rospy.Publisher("/CMD/ControlMoveMobile",String,queue_size=10)
+    while not rospy.is_shutdown():
+        pub.publish(stages)
+        rospy.sleep(0.1)
 def main():
-    global jointState_Data , iteration
+    global jointState_Data , iteration , stages
     # Initialize the moveit_commander and rospy
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node('move_to_pose', anonymous=True)
@@ -149,6 +156,10 @@ def main():
     group = moveit_commander.MoveGroupCommander("arm_group")  # Replace "arm_group" with your group name
     SUB_TRIGGER = True
     prep_data = None
+    control_mobile = threading.Thread(target = Threading_CMDtoCTRLMoboile)
+    control_mobile.daemon = True
+    control_mobile.start()
+    
     try:
         # Example: Moving the robot to new poses sequentially
         while not rospy.is_shutdown():
@@ -162,8 +173,9 @@ def main():
                 if SUB_TRIGGER == True :
                     data = pd.read_csv("./DataBag.csv")
                     msg = String()
-                    
+                    print(len(data) - 100)
                     for i in range(len(data)):
+                        
                         '''
                         ofset_x , ofset_y , ofset_z =  215 , 130 , 11.0   # recommend in distance X =  25 cm ref from manipulator base origin 
                         X, Y , Z ,= data.iloc[i]["Position_X"] - ofset_x , ofset_y - data.iloc[i]["Position_Y"] , data.iloc[i]["Position_Z"] - ofset_z
@@ -181,7 +193,8 @@ def main():
                         Rr,Rp,Ry = rotation.as_euler('xyz', degrees=True)
                         x, y, z = matrix[:3, 3]
                         #print(x,y * -1 ,z)
-                        
+                        print("iteration :",i)
+                        print(response_MobilePose)
                         if i == 0 :
                             print("Iteration :",i+1,"/",len(data)+1 , "start")
                             MoveSetPose(group,"prep_pose")
@@ -196,8 +209,13 @@ def main():
                             pub.publish(msg)
                             jointState_Data['gripper'] = True
                             print(msg)
-                        if i > 0 and i < len(data) - 30:
+                            stages = "None"
 
+                        if i == 50 :
+                            stages = "movetoStep2"
+                            print("MOVE2STAAGE2")
+                            time.sleep(1)
+                        if i > 0 and i < len(data) - 30:
                             msg.data = "pass"
                             pub.publish(msg)
                             #print(round(25/100,3) , round((y/100)*-1,3), round((z/100),3))
@@ -207,15 +225,15 @@ def main():
                                 move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry )   
                             
                             prep_data = [round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]
-                        
-                        
+                            stages = "None"
+
                         if i >= len(data) - 29 and i < len(data) -1 :
                             print("Iteration :",i+1 , "/",len(data)+1)
                             move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
                             msg.data = "pass"
                             pub.publish(msg)
                             jointState_Data['gripper'] = True
-                            
+                            stages = "None"
                         if i == len(data) - 1 :
                             print("Iteration :",i+1 , "/",len(data)+1,"Last")
                             move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
@@ -241,11 +259,12 @@ def main():
                             time.sleep(2)
                             MoveSetPose(group,"init_pose")
                             time.sleep(2)
-
-                            
+                            stages = "None"
+                        
                             
                         else:
                             msg.data = "pass"
+                            stages = "None"
                             pub.publish(msg)
 
                         
@@ -259,6 +278,7 @@ def main():
     finally:
         # Shutdown moveit_commander
         moveit_commander.roscpp_shutdown()
+
 
 if __name__ == '__main__':
     transforms = Transformation()
