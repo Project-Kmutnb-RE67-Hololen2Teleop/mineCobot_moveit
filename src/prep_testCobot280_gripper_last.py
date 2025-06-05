@@ -154,7 +154,7 @@ def main():
     # Get the robot's move group
     robot = moveit_commander.RobotCommander()
     group = moveit_commander.MoveGroupCommander("arm_group")  # Replace "arm_group" with your group name
-    SUB_TRIGGER = True
+    SUB_TRIGGER = False
     prep_data = None
     control_mobile = threading.Thread(target = Threading_CMDtoCTRLMoboile)
     control_mobile.daemon = True
