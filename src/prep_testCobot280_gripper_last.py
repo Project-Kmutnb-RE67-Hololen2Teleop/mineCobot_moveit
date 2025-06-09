@@ -186,7 +186,7 @@ def main():
                         #set position of manipulator
                         response_MobilePose = requests.get("https://188.166.222.52:12345/MyAGV/Position/current",verify=False).json()
                         #transforms.setBaseManip([158.8 , 129 , 11 ],[0,0,0])
-                        transforms.setBaseManip([response_MobilePose['x'] + DEFAULT_VAR.OFSET_MANIP_X.value,-(response_MobilePose['y']),DEFAULT_VAR.OFSET_MANIP_Z.value] , [response_MobilePose['row'],-(response_MobilePose['pitch']),response_MobilePose['yaw']])
+                        transforms.setBaseManip([response_MobilePose['x'] + DEFAULT_VAR.OFSET_MANIP_X.value,-(response_MobilePose['y']),DEFAULT_VAR.OFSET_MANIP_Z.value] , [0,-0,response_MobilePose['yaw']])
                         transforms.setObjectPose([data.iloc[i]["Position_X"],(data.iloc[i]["Position_Y"]) ,data.iloc[i]["Position_Z"]],
                                                  [(data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value) *-1 , data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value, data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value])
                         matrix = transforms.outputPosition()
