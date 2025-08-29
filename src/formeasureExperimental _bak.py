@@ -28,7 +28,7 @@ class DEFAULT_VAR(Enum):
     #-----
     OFSET_MANIP_X = 5.5   #ระยะจาก center ของ mobile ไป centerฐานของ manipulator
     OFSET_MANIP_Y = 0
-    OFSET_MANIP_Z = 11.5    #ระยะสูงจาก center ของ mobile ไป centerฐานของ manipulator
+    OFSET_MANIP_Z = 12    #ระยะสูงจาก center ของ mobile ไป centerฐานของ manipulator
 
 
 class Transformation:
@@ -58,7 +58,7 @@ class Transformation:
             [np.sin(rz), np.cos(rz), 0],
             [0, 0, 1]
         ])
-
+        #transforms.setBaseManip([BASE[0] + DEFAULT_VAR.OFSET_MANIP_X.value,-(BASE[1]),DEFAULT_VAR.OFSET_MANIP_Z.value] , [0,-0,YAW])
     def setBaseManip(self, Pose, orien):
         self.R_baseManip = self.Rz(orien[2]) @ self.Ry(orien[1]) @ self.Rx(orien[0])
         self.BaseManip = np.eye(4)
@@ -155,12 +155,12 @@ def main():
     # Get the robot's move group
     robot = moveit_commander.RobotCommander()
     group = moveit_commander.MoveGroupCommander("arm_group")  # Replace "arm_group" with your group name
-    SUB_TRIGGER = False
+    SUB_TRIGGER = True  #DEFAULT = FASLE
     prep_data = None
     control_mobile = threading.Thread(target = Threading_CMDtoCTRLMoboile)
     control_mobile.daemon = True
     control_mobile.start()
-    
+    SWITCH_POSITION_THRESHOLD = 100
     try:
         # Example: Moving the robot to new poses sequentially
         while not rospy.is_shutdown():
@@ -174,34 +174,80 @@ def main():
                 if SUB_TRIGGER == True :
                     data = pd.read_csv("./DataBag.csv")
                     msg = String()
-                    print(len(data) - 100)
+                    #print(len(data) - 100)
+                    #WHICH_OBJ = int(input("Insert number ITERATION OBJECT (1,2,3) : "))
+                                            #set position of manipulator
+                    '''
+                    OBS_X = 35
+                    OBS_Y = 4
+                    PICK = [
+                            [182 - OBS_X , -(94+OBS_Y)],
+                            [182 - OBS_X , -(99+OBS_Y)],
+                            [182 - OBS_X , -(104+OBS_Y)]
+                        ]
+                    PLACE =  [
+                            [182 - OBS_X , -(134+OBS_Y)],
+                            [182 - OBS_X , -(139+OBS_Y)],
+                            [182 - OBS_X , -(144+OBS_Y)]
+                        ]
+                    YAW = 0
+                    '''
+                    OBS_X = 32  #ยิ่งเลขน้อยลงก็จะหยิบได้ไกลขึ้น
+
+
+                    OBS_Y =23
+                    Pyaw = np.rad2deg(-0.023)
+                    PICK = [
+                        #116
+                            [151+OBS_X , -80.63-OBS_Y],
+                            
+                        ]
+                    PLACE =  [
+                            [118.46+OBS_X , -75.09-OBS_Y],
+                            
+                        ]
+                    
+
+
+                    PICK_X = float(input("Insert Pick Location X :")) ; PICK_Y = float(input("Insert Pick Location Y :"))
+                    YAW = float(input("Insert Pick Rotation Yw :"))
+                    BASE = [PICK_X,PICK_Y]
+                    PLACE = None
                     for i in range(len(data)):
-                        
+                        print(PLACE)
                         '''
                         ofset_x , ofset_y , ofset_z =  215 , 130 , 11.0   # recommend in distance X =  25 cm ref from manipulator base origin 
                         X, Y , Z ,= data.iloc[i]["Position_X"] - ofset_x , ofset_y - data.iloc[i]["Position_Y"] , data.iloc[i]["Position_Z"] - ofset_z
                         r , p , y = data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value , data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value , data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value
                         move_to_pose(group, 25/100, Y/100 , Z/100 ,(-1 )*p , r , y )'
                         '''
-                        #set position of manipulator
-                        response_MobilePose = requests.get("https://188.166.222.52:12345/MyAGV/Position/current",verify=False).json()
+                        
+                        if i == SWITCH_POSITION_THRESHOLD :
+                            PLACE_X = float(input("Insert PLACE Location X :")) ; PLACE_Y = float(input("Insert PLACE Location Y :"))
+                            YAW = float(input("Insert PLACERotation Yw :"))
+                            BASE = [PLACE_X , PLACE_Y]
+                        
+                        
+                        
                         #transforms.setBaseManip([158.8 , 129 , 11 ],[0,0,0])
-                        transforms.setBaseManip([response_MobilePose['x'] + DEFAULT_VAR.OFSET_MANIP_X.value,-(response_MobilePose['y']),DEFAULT_VAR.OFSET_MANIP_Z.value] , [0,-0,response_MobilePose['yaw']])
+                        print(BASE)
+                        transforms.setBaseManip([BASE[0] + DEFAULT_VAR.OFSET_MANIP_X.value,-(BASE[1]),DEFAULT_VAR.OFSET_MANIP_Z.value] , [0,-0,YAW])
                         transforms.setObjectPose([data.iloc[i]["Position_X"],(data.iloc[i]["Position_Y"]) ,data.iloc[i]["Position_Z"]],
                                                  [(data.iloc[i]["Rotation_Pitch"] + DEFAULT_VAR.PITCH.value) *-1 , data.iloc[i]["Rotation_Roll"] + DEFAULT_VAR.ROW.value, data.iloc[i]["Rotation_Yaw"] + DEFAULT_VAR.YAW.value])
                         matrix = transforms.outputPosition()
                         rotation = R.from_matrix(matrix[:3, :3])
                         Rr,Rp,Ry = rotation.as_euler('xyz', degrees=True)
                         x, y, z = matrix[:3, 3]
+                        print("Object POSE NOW :", x , y , Ry)
                         #print(x,y * -1 ,z)
                         print("iteration :",i)
-                        print(response_MobilePose)
+                        #print(response_MobilePose)
                         if i == 0 :
                             print("Iteration :",i+1,"/",len(data)+1 , "start")
-                            MoveSetPose(group,"prep_pose")
-                            time.sleep(2)
+                            #MoveSetPose(group,"prep_pose")
+                            #time.sleep(7)
                             move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round(((z+DEFAULT_VAR.OFSET_UP.value)/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
-                            time.sleep(10)
+                            time.sleep(20)
                             move_to_pose(group, round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value) ,Rr , Rp , Ry ) 
                             msg.data = "on"
                             rospy.loginfo("gripper on")
@@ -212,11 +258,10 @@ def main():
                             print(msg)
                             stages = "None"
 
-                        if i == 50 :
-                            stages = "movetoStep2"
-                            print("MOVE2STAAGE2")
-                            time.sleep(1)
-                        if i > 0 and i < len(data) - 30:
+                        
+
+                        
+                        if i > 0 and i < SWITCH_POSITION_THRESHOLD:
                             msg.data = "pass"
                             pub.publish(msg)
                             #print(round(25/100,3) , round((y/100)*-1,3), round((z/100),3))
@@ -227,8 +272,21 @@ def main():
                             
                             prep_data = [round(x/100,DEFAULT_VAR.DIGIT_CTRL.value) , round((y/100)*-1,DEFAULT_VAR.DIGIT_CTRL.value), round((z/100),DEFAULT_VAR.DIGIT_CTRL.value)]
                             stages = "None"
+                        
+                        '''
+                        if i == SWITCH_POSITION_THRESHOLD :
+                            stages = "movetoStep2"
+                            print("MOVE2STAAGE2")
+                            time.sleep(5)
+                        '''
 
-                        if i >= len(data) - 29 and i < len(data) -1 :
+                        #if i == SWITCH_POSITION_THRESHOLD :
+                        #    int(input('insert Number :'))
+                                
+                        
+
+
+                        if i >= len(data) - 50 and i < len(data) -1 :
                             print("Iteration :",i+1 , "/",len(data)+1)
                             move_to_pose(group, x/100 , (y/100)*-1, z/100 ,Rr , Rp , Ry )
                             msg.data = "pass"
